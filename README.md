@@ -21,7 +21,7 @@ http://har777.github.io/show-me-the-way/#comments=residential
 You can change the speed of the edits like:
 http://har777.github.io/show-me-the-way/#speed=700
 
-Any of the above can be combined using '&'
+Any of the above can be combined using '&'.
 General URL design : 'http://har777.github.io/show-me-the-way/#bbox=-90,-180,90,180&users=har777,geohacker&comments=mapbox&speed=100'
 
 

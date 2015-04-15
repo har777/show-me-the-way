@@ -217,7 +217,7 @@ osmStream.runFn(function(err, data) {
             commentCleared;
     }).sort(function(a, b) {
         return (+new Date(a.meta.tilestamp)) -
-            (+new Date(a.meta.tilestamp));
+            (+new Date(b.meta.tilestamp));
     });
     // if (queue.length > 2000) queue = queue.slice(0, 2000);
     // runSpeed = 500;

@@ -162,7 +162,7 @@ function fetchComment(id) {
 
 //Store containing changeset as key and comment as value. 
 var comments = {};
-
+var editors = {};
 // The number of changes to show per minute
 osmStream.runFn(function(err, data) {
     queue = _.filter(data, function(f) {
@@ -171,7 +171,8 @@ osmStream.runFn(function(err, data) {
         else {var userCleared = filteredUsers.indexOf(f.meta.user) > -1; console.log(userCleared);}
         console.log(f.meta.user);
         //Checking if comment contains required term. eg. Mapbox.
-        var comment = ''; 
+        var comment = '';
+        var editor = '';
         //comment = fetchComment(f.feature.changeset);
 
         console.log(f.feature.changeset);
@@ -194,8 +195,12 @@ osmStream.runFn(function(err, data) {
                 if (tags[i].getAttribute('k') == 'comment') {
                     comment = tags[i].getAttribute('v').substring(0, 60);
                 }
+                if (tags[i].getAttribute('k') == 'created_by') {
+                    editor = tags[i].getAttribute('v').substring(0, 50);
+                }
             }
             comments[f.feature.changeset] = comment;
+            editors[f.feature.changeset] = editor;
             //console.log(comment);
             //console.log('added to cache');
         }
@@ -270,8 +275,8 @@ function drawWay(change, cb) {
         new L.LatLng(way.bounds[0], way.bounds[1]));
 
     if (farFromLast(bounds.getCenter())) showLocation(bounds.getCenter());
-    showComment(way.changeset);
-
+    //showComment(way.changeset);
+    document.getElementById('comment').innerHTML = comments[way.changeset] + ' in ' + editors[way.changeset];
     var timedate = moment(change.meta.timestamp);
     change.timetext = timedate.fromNow();
 
