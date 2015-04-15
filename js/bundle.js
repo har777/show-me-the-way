@@ -4,10 +4,50 @@ var osmStream = require('osm-stream'),
     moment = require('moment'),
     _ = require('underscore');
 
-var bboxString = ["-90.0", "-180.0", "90.0", "180.0"];
-if (location.hash) {
-    bboxString = location.hash.replace('#', '').split(',');
+//URL Design : 'localhost:8000/#bbox=-90,-180,90,180&users=har777,geohacker&comments=mapbox&speed=100'
+
+// Used to parse the url hash. Pass in any url with the hash format '#key1=val1,val2&key2=val1,val2,val3' and it returns an object with the hash key-value pairs.
+function parseParms(str) {
+    var pieces = str.split("&"), data = {}, i, parts;
+    for (i = 0; i < pieces.length; i++) {
+        parts = pieces[i].split("=");
+        if (parts.length < 2) {
+            parts.push("");
+        }
+        data[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
+    }
+    return data;
 }
+
+var filterDataParams = {};
+
+if(location.hash){
+    // Parsing and storing url hash keys to object.
+    var filterDataParamsString = window.location.hash.split('#')[1];
+    var filterDataParams = parseParms(filterDataParamsString);
+}
+
+var bboxString = ["-90.0", "-180.0", "90.0", "180.0"];
+if('bbox' in filterDataParams) {
+    var bboxString = filterDataParams['bbox'].split(',');
+}
+
+var filteredUsers = [];
+if('users' in filterDataParams) {
+    var filteredUsers = filterDataParams['users'].split(',');
+}
+
+var filteredCommentTerms = [''];
+if('comments' in filterDataParams) {
+    var filteredCommentTerms = filterDataParams['comments'].split(',');
+}
+
+var runSpeed = 2000;
+if('speed' in filterDataParams) {
+    var runSpeed = parseInt(filterDataParams['speed']);
+}
+
+console.log(bboxString, filteredUsers, filteredCommentTerms, runSpeed);
 
 var ignore = ['bot-mode'];
 var BING_KEY = 'Arzdiw4nlOJzRwOz__qailc8NiR31Tt51dN2D7cm57NrnceZnCpgOkmJhNpGoppU';
@@ -99,11 +139,73 @@ function showComment(id) {
     });
 }
 
-var runSpeed = 2000;
+/*
+function fetchComment(id) {
+    var changeset_url_tmpl = '//www.openstreetmap.org/api/0.6/changeset/{id}';
+    var comment = '';
+    reqwest({
+        url: changeset_url_tmpl
+            .replace('{id}', id),
+        crossOrigin: true,
+        type: 'xml'
+    }, function(resp) {
+        var tags = resp.getElementsByTagName('tag');
+        for (var i = 0; i < tags.length; i++) {
+            if (tags[i].getAttribute('k') == 'comment') {
+                comment = tags[i].getAttribute('v').substring(0, 60);
+            }
+        }
+    });
+    return comment;
+}
+*/
+
+//Store containing changeset as key and comment as value. 
+var comments = {};
 
 // The number of changes to show per minute
 osmStream.runFn(function(err, data) {
     queue = _.filter(data, function(f) {
+        // Checking if user in filtered list.
+        if(filteredUsers.length == 0) {var userCleared = true;}
+        else {var userCleared = filteredUsers.indexOf(f.meta.user) > -1; console.log(userCleared);}
+        console.log(f.meta.user);
+        //Checking if comment contains required term. eg. Mapbox.
+        var comment = ''; 
+        //comment = fetchComment(f.feature.changeset);
+
+        console.log(f.feature.changeset);
+        if(f.feature.changeset in comments) {
+            comment = comments[f.feature.changeset];
+            //console.log('found in cache');
+        }
+        else {  
+            var xmlHttp = null;
+            xmlHttp = new XMLHttpRequest();
+            xmlHttp.open( "GET", '//www.openstreetmap.org/api/0.6/changeset/' + f.feature.changeset, false );
+            xmlHttp.send( null );
+            var changesetResponse = xmlHttp.response;
+
+            var parser = new DOMParser();
+            var xmlDoc = parser.parseFromString(changesetResponse, "text/xml");
+            var tags = xmlDoc.getElementsByTagName('tag');
+
+            for (var i = 0; i < tags.length; i++) {
+                if (tags[i].getAttribute('k') == 'comment') {
+                    comment = tags[i].getAttribute('v').substring(0, 60);
+                }
+            }
+            comments[f.feature.changeset] = comment;
+            //console.log(comment);
+            //console.log('added to cache');
+        }
+
+        comment = comment.toLowerCase();
+
+        if(filteredCommentTerms.length != 0 && comment.length == 0) {var commentCleared = false;}
+        else if(filteredCommentTerms.length == 0 && comment.length == 0) {var commentCleared = true;}
+        else {var commentCleared = comment.indexOf(filteredCommentTerms[0].toLowerCase()) > -1;}
+        
         return f.feature && f.feature.type === 'way' &&
             (bbox.intersects(new L.LatLngBounds(
                 new L.LatLng(f.feature.bounds[0], f.feature.bounds[1]),
@@ -111,13 +213,15 @@ osmStream.runFn(function(err, data) {
             f.feature.linestring &&
             moment(f.meta.timestamp).format("MMM Do YY") === moment().format("MMM Do YY") &&
             ignore.indexOf(f.meta.user) === -1 &&
-            f.feature.linestring.length > 4;
+            f.feature.linestring.length > 4 &&
+            userCleared &&
+            commentCleared;
     }).sort(function(a, b) {
         return (+new Date(a.meta.tilestamp)) -
             (+new Date(a.meta.tilestamp));
     });
     // if (queue.length > 2000) queue = queue.slice(0, 2000);
-    runSpeed = 1500;
+    // runSpeed = 500;
 });
 
 function doDrawWay() {
@@ -202,12 +306,12 @@ function drawWay(change, cb) {
             window.setTimeout(cb, perPt * 2);
         }
     }
-
     newLine.addLatLng(way.linestring.pop());
     drawPt(way.linestring.pop());
 }
 
 doDrawWay();
+
 
 },{"moment":2,"osm-stream":3,"reqwest":6,"underscore":7}],2:[function(require,module,exports){
 // moment.js
@@ -5161,122 +5265,122 @@ function assert (test, message) {
 var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 ;(function (exports) {
-	'use strict';
+    'use strict';
 
   var Arr = (typeof Uint8Array !== 'undefined')
     ? Uint8Array
     : Array
 
-	var PLUS   = '+'.charCodeAt(0)
-	var SLASH  = '/'.charCodeAt(0)
-	var NUMBER = '0'.charCodeAt(0)
-	var LOWER  = 'a'.charCodeAt(0)
-	var UPPER  = 'A'.charCodeAt(0)
+    var PLUS   = '+'.charCodeAt(0)
+    var SLASH  = '/'.charCodeAt(0)
+    var NUMBER = '0'.charCodeAt(0)
+    var LOWER  = 'a'.charCodeAt(0)
+    var UPPER  = 'A'.charCodeAt(0)
 
-	function decode (elt) {
-		var code = elt.charCodeAt(0)
-		if (code === PLUS)
-			return 62 // '+'
-		if (code === SLASH)
-			return 63 // '/'
-		if (code < NUMBER)
-			return -1 //no match
-		if (code < NUMBER + 10)
-			return code - NUMBER + 26 + 26
-		if (code < UPPER + 26)
-			return code - UPPER
-		if (code < LOWER + 26)
-			return code - LOWER + 26
-	}
+    function decode (elt) {
+        var code = elt.charCodeAt(0)
+        if (code === PLUS)
+            return 62 // '+'
+        if (code === SLASH)
+            return 63 // '/'
+        if (code < NUMBER)
+            return -1 //no match
+        if (code < NUMBER + 10)
+            return code - NUMBER + 26 + 26
+        if (code < UPPER + 26)
+            return code - UPPER
+        if (code < LOWER + 26)
+            return code - LOWER + 26
+    }
 
-	function b64ToByteArray (b64) {
-		var i, j, l, tmp, placeHolders, arr
+    function b64ToByteArray (b64) {
+        var i, j, l, tmp, placeHolders, arr
 
-		if (b64.length % 4 > 0) {
-			throw new Error('Invalid string. Length must be a multiple of 4')
-		}
+        if (b64.length % 4 > 0) {
+            throw new Error('Invalid string. Length must be a multiple of 4')
+        }
 
-		// the number of equal signs (place holders)
-		// if there are two placeholders, than the two characters before it
-		// represent one byte
-		// if there is only one, then the three characters before it represent 2 bytes
-		// this is just a cheap hack to not do indexOf twice
-		var len = b64.length
-		placeHolders = '=' === b64.charAt(len - 2) ? 2 : '=' === b64.charAt(len - 1) ? 1 : 0
+        // the number of equal signs (place holders)
+        // if there are two placeholders, than the two characters before it
+        // represent one byte
+        // if there is only one, then the three characters before it represent 2 bytes
+        // this is just a cheap hack to not do indexOf twice
+        var len = b64.length
+        placeHolders = '=' === b64.charAt(len - 2) ? 2 : '=' === b64.charAt(len - 1) ? 1 : 0
 
-		// base64 is 4/3 + up to two characters of the original data
-		arr = new Arr(b64.length * 3 / 4 - placeHolders)
+        // base64 is 4/3 + up to two characters of the original data
+        arr = new Arr(b64.length * 3 / 4 - placeHolders)
 
-		// if there are placeholders, only get up to the last complete 4 chars
-		l = placeHolders > 0 ? b64.length - 4 : b64.length
+        // if there are placeholders, only get up to the last complete 4 chars
+        l = placeHolders > 0 ? b64.length - 4 : b64.length
 
-		var L = 0
+        var L = 0
 
-		function push (v) {
-			arr[L++] = v
-		}
+        function push (v) {
+            arr[L++] = v
+        }
 
-		for (i = 0, j = 0; i < l; i += 4, j += 3) {
-			tmp = (decode(b64.charAt(i)) << 18) | (decode(b64.charAt(i + 1)) << 12) | (decode(b64.charAt(i + 2)) << 6) | decode(b64.charAt(i + 3))
-			push((tmp & 0xFF0000) >> 16)
-			push((tmp & 0xFF00) >> 8)
-			push(tmp & 0xFF)
-		}
+        for (i = 0, j = 0; i < l; i += 4, j += 3) {
+            tmp = (decode(b64.charAt(i)) << 18) | (decode(b64.charAt(i + 1)) << 12) | (decode(b64.charAt(i + 2)) << 6) | decode(b64.charAt(i + 3))
+            push((tmp & 0xFF0000) >> 16)
+            push((tmp & 0xFF00) >> 8)
+            push(tmp & 0xFF)
+        }
 
-		if (placeHolders === 2) {
-			tmp = (decode(b64.charAt(i)) << 2) | (decode(b64.charAt(i + 1)) >> 4)
-			push(tmp & 0xFF)
-		} else if (placeHolders === 1) {
-			tmp = (decode(b64.charAt(i)) << 10) | (decode(b64.charAt(i + 1)) << 4) | (decode(b64.charAt(i + 2)) >> 2)
-			push((tmp >> 8) & 0xFF)
-			push(tmp & 0xFF)
-		}
+        if (placeHolders === 2) {
+            tmp = (decode(b64.charAt(i)) << 2) | (decode(b64.charAt(i + 1)) >> 4)
+            push(tmp & 0xFF)
+        } else if (placeHolders === 1) {
+            tmp = (decode(b64.charAt(i)) << 10) | (decode(b64.charAt(i + 1)) << 4) | (decode(b64.charAt(i + 2)) >> 2)
+            push((tmp >> 8) & 0xFF)
+            push(tmp & 0xFF)
+        }
 
-		return arr
-	}
+        return arr
+    }
 
-	function uint8ToBase64 (uint8) {
-		var i,
-			extraBytes = uint8.length % 3, // if we have 1 byte left, pad 2 bytes
-			output = "",
-			temp, length
+    function uint8ToBase64 (uint8) {
+        var i,
+            extraBytes = uint8.length % 3, // if we have 1 byte left, pad 2 bytes
+            output = "",
+            temp, length
 
-		function encode (num) {
-			return lookup.charAt(num)
-		}
+        function encode (num) {
+            return lookup.charAt(num)
+        }
 
-		function tripletToBase64 (num) {
-			return encode(num >> 18 & 0x3F) + encode(num >> 12 & 0x3F) + encode(num >> 6 & 0x3F) + encode(num & 0x3F)
-		}
+        function tripletToBase64 (num) {
+            return encode(num >> 18 & 0x3F) + encode(num >> 12 & 0x3F) + encode(num >> 6 & 0x3F) + encode(num & 0x3F)
+        }
 
-		// go through the array every three bytes, we'll deal with trailing stuff later
-		for (i = 0, length = uint8.length - extraBytes; i < length; i += 3) {
-			temp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
-			output += tripletToBase64(temp)
-		}
+        // go through the array every three bytes, we'll deal with trailing stuff later
+        for (i = 0, length = uint8.length - extraBytes; i < length; i += 3) {
+            temp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
+            output += tripletToBase64(temp)
+        }
 
-		// pad the end with zeros, but make sure to not forget the extra bytes
-		switch (extraBytes) {
-			case 1:
-				temp = uint8[uint8.length - 1]
-				output += encode(temp >> 2)
-				output += encode((temp << 4) & 0x3F)
-				output += '=='
-				break
-			case 2:
-				temp = (uint8[uint8.length - 2] << 8) + (uint8[uint8.length - 1])
-				output += encode(temp >> 10)
-				output += encode((temp >> 4) & 0x3F)
-				output += encode((temp << 2) & 0x3F)
-				output += '='
-				break
-		}
+        // pad the end with zeros, but make sure to not forget the extra bytes
+        switch (extraBytes) {
+            case 1:
+                temp = uint8[uint8.length - 1]
+                output += encode(temp >> 2)
+                output += encode((temp << 4) & 0x3F)
+                output += '=='
+                break
+            case 2:
+                temp = (uint8[uint8.length - 2] << 8) + (uint8[uint8.length - 1])
+                output += encode(temp >> 10)
+                output += encode((temp >> 4) & 0x3F)
+                output += encode((temp << 2) & 0x3F)
+                output += '='
+                break
+        }
 
-		return output
-	}
+        return output
+    }
 
-	exports.toByteArray = b64ToByteArray
-	exports.fromByteArray = uint8ToBase64
+    exports.toByteArray = b64ToByteArray
+    exports.fromByteArray = uint8ToBase64
 }(typeof exports === 'undefined' ? (this.base64js = {}) : exports))
 
 },{}],10:[function(require,module,exports){
