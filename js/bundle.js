@@ -115,7 +115,7 @@ function showLocation(ll) {
             '' + resp.display_name + '';
     });
 }
-
+/*
 function showComment(id) {
     var changeset_url_tmpl = '//www.openstreetmap.org/api/0.6/changeset/{id}';
     reqwest({
@@ -138,7 +138,7 @@ function showComment(id) {
         document.getElementById('comment').innerHTML = comment + ' in ' + editor;
     });
 }
-
+*/
 /*
 function fetchComment(id) {
     var changeset_url_tmpl = '//www.openstreetmap.org/api/0.6/changeset/{id}';
@@ -169,42 +169,42 @@ osmStream.runFn(function(err, data) {
         // Checking if user in filtered list.
         if(filteredUsers.length == 0) {var userCleared = true;}
         else {var userCleared = filteredUsers.indexOf(f.meta.user) > -1; console.log(userCleared);}
-        console.log(f.meta.user);
+        //console.log(f.meta.user);
         //Checking if comment contains required term. eg. Mapbox.
         var comment = '';
         var editor = '';
         //comment = fetchComment(f.feature.changeset);
-
-        console.log(f.feature.changeset);
-        if(f.feature.changeset in comments) {
-            comment = comments[f.feature.changeset];
-            //console.log('found in cache');
-        }
-        else {  
-            var xmlHttp = null;
-            xmlHttp = new XMLHttpRequest();
-            xmlHttp.open( "GET", '//www.openstreetmap.org/api/0.6/changeset/' + f.feature.changeset, false );
-            xmlHttp.send( null );
-            var changesetResponse = xmlHttp.response;
-
-            var parser = new DOMParser();
-            var xmlDoc = parser.parseFromString(changesetResponse, "text/xml");
-            var tags = xmlDoc.getElementsByTagName('tag');
-
-            for (var i = 0; i < tags.length; i++) {
-                if (tags[i].getAttribute('k') == 'comment') {
-                    comment = tags[i].getAttribute('v').substring(0, 60);
-                }
-                if (tags[i].getAttribute('k') == 'created_by') {
-                    editor = tags[i].getAttribute('v').substring(0, 50);
-                }
+        if(userCleared) {
+            //console.log(f.feature.changeset);
+            if(f.feature.changeset in comments) {
+                comment = comments[f.feature.changeset];
+                //console.log('found in cache');
             }
-            comments[f.feature.changeset] = comment;
-            editors[f.feature.changeset] = editor;
-            //console.log(comment);
-            //console.log('added to cache');
-        }
+            else {  
+                var xmlHttp = null;
+                xmlHttp = new XMLHttpRequest();
+                xmlHttp.open( "GET", '//www.openstreetmap.org/api/0.6/changeset/' + f.feature.changeset, false );
+                xmlHttp.send( null );
+                var changesetResponse = xmlHttp.response;
 
+                var parser = new DOMParser();
+                var xmlDoc = parser.parseFromString(changesetResponse, "text/xml");
+                var tags = xmlDoc.getElementsByTagName('tag');
+
+                for (var i = 0; i < tags.length; i++) {
+                    if (tags[i].getAttribute('k') == 'comment') {
+                        comment = tags[i].getAttribute('v').substring(0, 60);
+                    }
+                    if (tags[i].getAttribute('k') == 'created_by') {
+                        editor = tags[i].getAttribute('v').substring(0, 50);
+                    }
+                }
+                comments[f.feature.changeset] = comment;
+                editors[f.feature.changeset] = editor;
+                //console.log(comment);
+                //console.log('added to cache');
+            }
+        }
         comment = comment.toLowerCase();
 
         if(filteredCommentTerms.length != 0 && comment.length == 0) {var commentCleared = false;}
