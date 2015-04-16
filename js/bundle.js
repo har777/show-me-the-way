@@ -42,12 +42,17 @@ if('comments' in filterDataParams) {
     var filteredCommentTerms = filterDataParams['comments'].split(',');
 }
 
+var filteredEditors = [];
+if('editors' in filterDataParams) {
+    var filteredEditors = filterDataParams['editors'].split(',');
+}
+
 var runSpeed = 2000;
 if('speed' in filterDataParams) {
     var runSpeed = parseInt(filterDataParams['speed']);
 }
 
-console.log(bboxString, filteredUsers, filteredCommentTerms, runSpeed);
+console.log(bboxString, filteredUsers, filteredCommentTerms, filteredEditors, runSpeed);
 
 var ignore = ['bot-mode'];
 var BING_KEY = 'Arzdiw4nlOJzRwOz__qailc8NiR31Tt51dN2D7cm57NrnceZnCpgOkmJhNpGoppU';
@@ -139,26 +144,35 @@ function showComment(id) {
     });
 }
 
-/*
-function fetchComment(id) {
-    var changeset_url_tmpl = '//www.openstreetmap.org/api/0.6/changeset/{id}';
+
+function fetchChangesetInfo(id) {
+    //console.log('calling api :' + id);
     var comment = '';
-    reqwest({
-        url: changeset_url_tmpl
-            .replace('{id}', id),
-        crossOrigin: true,
-        type: 'xml'
-    }, function(resp) {
-        var tags = resp.getElementsByTagName('tag');
-        for (var i = 0; i < tags.length; i++) {
-            if (tags[i].getAttribute('k') == 'comment') {
-                comment = tags[i].getAttribute('v').substring(0, 60);
-            }
+    var editor = '';
+    var xmlHttp = null;
+    xmlHttp = new XMLHttpRequest();
+    xmlHttp.open( "GET", '//www.openstreetmap.org/api/0.6/changeset/' + id, false );
+    xmlHttp.send( null );
+    var changesetResponse = xmlHttp.response;
+
+    var parser = new DOMParser();
+    var xmlDoc = parser.parseFromString(changesetResponse, "text/xml");
+    var tags = xmlDoc.getElementsByTagName('tag');
+
+    for (var i = 0; i < tags.length; i++) {
+        if (tags[i].getAttribute('k') == 'comment') {
+            comment = tags[i].getAttribute('v').substring(0, 60);
         }
-    });
-    return comment;
+        
+        if (tags[i].getAttribute('k') == 'created_by') {
+            editor = tags[i].getAttribute('v').substring(0, 50);
+        }
+    }
+    console.log({comment: comment, editor: editor});
+    return {comment: comment,
+            editor: editor};
 }
-*/
+
 
 //Store containing changeset as key and comment as value. 
 var comments = {};
@@ -168,52 +182,41 @@ osmStream.runFn(function(err, data) {
     queue = _.filter(data, function(f) {
         // Checking if user in filtered list.
         if(filteredUsers.length == 0) {var userCleared = true;}
-        else {var userCleared = filteredUsers.indexOf(f.meta.user) > -1; console.log(userCleared);}
+        else {var userCleared = filteredUsers.indexOf(f.meta.user) > -1; }//console.log(userCleared);}
         //console.log(f.meta.user);
+        
         //Checking if comment contains required term. eg. Mapbox.
         var comment = '';
         var editor = '';
-        //comment = fetchComment(f.feature.changeset);
-        if(userCleared && filteredCommentTerms.length != 0) {
+
+        if(userCleared && ((filteredCommentTerms.length != 0) || (filteredEditors.length != 0))) {
             //console.log(f.feature.changeset);
             if(f.feature.changeset in comments) {
                 comment = comments[f.feature.changeset];
+                editor = editors[f.feature.changeset];
                 //console.log('found in cache');
             }
             else {  
-                console.log('calling api');
-                var xmlHttp = null;
-                xmlHttp = new XMLHttpRequest();
-                xmlHttp.open( "GET", '//www.openstreetmap.org/api/0.6/changeset/' + f.feature.changeset, false );
-                xmlHttp.send( null );
-                var changesetResponse = xmlHttp.response;
-
-                var parser = new DOMParser();
-                var xmlDoc = parser.parseFromString(changesetResponse, "text/xml");
-                var tags = xmlDoc.getElementsByTagName('tag');
-
-                for (var i = 0; i < tags.length; i++) {
-                    if (tags[i].getAttribute('k') == 'comment') {
-                        comment = tags[i].getAttribute('v').substring(0, 60);
-                    }
-                    /*
-                    if (tags[i].getAttribute('k') == 'created_by') {
-                        editor = tags[i].getAttribute('v').substring(0, 50);
-                    }
-                    */
-                }
+                var changesetInfo = fetchChangesetInfo(f.feature.changeset);
+                comment = changesetInfo.comment;
+                editor = changesetInfo.editor;
                 comments[f.feature.changeset] = comment;
                 editors[f.feature.changeset] = editor;
-                //console.log(comment);
-                //console.log('added to cache');
             }
         }
         comment = comment.toLowerCase();
+        editor = editor.toLowerCase();
 
+        //Checking for filtered comments.
         if(filteredCommentTerms.length != 0 && comment.length == 0) {var commentCleared = false;}
-        else if(filteredCommentTerms.length == 0 && comment.length == 0) {var commentCleared = true;}
+        else if(filteredCommentTerms.length == 0) {var commentCleared = true;}
         else {var commentCleared = comment.indexOf(filteredCommentTerms[0].toLowerCase()) > -1;}
-        
+
+        //Checking for filtered editors.
+        if(filteredEditors.length != 0 && editor.length == 0) {var editorCleared = false;}
+        else if(filteredEditors.length == 0) {var editorCleared = true;}
+        else {var editorCleared = editor.indexOf(filteredEditors[0].toLowerCase()) > -1;}
+        console.log(commentCleared, editorCleared);
         return f.feature && f.feature.type === 'way' &&
             (bbox.intersects(new L.LatLngBounds(
                 new L.LatLng(f.feature.bounds[0], f.feature.bounds[1]),
@@ -223,7 +226,8 @@ osmStream.runFn(function(err, data) {
             ignore.indexOf(f.meta.user) === -1 &&
             f.feature.linestring.length > 4 &&
             userCleared &&
-            commentCleared;
+            commentCleared &&
+            editorCleared;
     }).sort(function(a, b) {
         return (+new Date(a.meta.tilestamp)) -
             (+new Date(a.meta.tilestamp));
