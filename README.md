@@ -18,10 +18,13 @@ http://har777.github.io/show-me-the-way/#users=har777,geohacker
 You can restrict it to viewing only edits containing comments containing a particular string like this:
 http://har777.github.io/show-me-the-way/#comments=residential
 
+You can restrict it to viewing only edits from a particular editor:
+http://har777.github.io/show-me-the-way/#editors=JOSM
+
 You can change the speed of the edits like:
 http://har777.github.io/show-me-the-way/#speed=700
 
 Any of the above can be combined using '&'.
-General URL design : 'http://har777.github.io/show-me-the-way/#bbox=-90,-180,90,180&users=har777,geohacker&comments=mapbox&speed=100'
+General URL design : 'http://har777.github.io/show-me-the-way/#bbox=-90,-180,90,180&users=har777,geohacker&comments=mapbox&editors=JOSM&speed=100'
 
 
