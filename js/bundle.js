@@ -123,25 +123,32 @@ function showLocation(ll) {
 
 function showComment(id) {
     var changeset_url_tmpl = '//www.openstreetmap.org/api/0.6/changeset/{id}';
-    reqwest({
-        url: changeset_url_tmpl
-            .replace('{id}', id),
-        crossOrigin: true,
-        type: 'xml'
-    }, function(resp) {
-        var tags = resp.getElementsByTagName('tag');
-        var comment = '',
-            editor = '';
-        for (var i = 0; i < tags.length; i++) {
-            if (tags[i].getAttribute('k') == 'comment') {
-                comment = tags[i].getAttribute('v').substring(0, 60);
+    if(id in comments) {
+        document.getElementById('comment').innerHTML = comments[id] + ' in ' + editors[id];
+        console.log('drawing from cache');
+    }
+    else {
+        reqwest({
+            url: changeset_url_tmpl
+                .replace('{id}', id),
+            crossOrigin: true,
+            type: 'xml'
+        }, function(resp) {
+            var tags = resp.getElementsByTagName('tag');
+            var comment = '',
+                editor = '';
+            for (var i = 0; i < tags.length; i++) {
+                if (tags[i].getAttribute('k') == 'comment') {
+                    comment = tags[i].getAttribute('v').substring(0, 60);
+                }
+                if (tags[i].getAttribute('k') == 'created_by') {
+                    editor = tags[i].getAttribute('v').substring(0, 50);
+                }
             }
-            if (tags[i].getAttribute('k') == 'created_by') {
-                editor = tags[i].getAttribute('v').substring(0, 50);
-            }
-        }
-        document.getElementById('comment').innerHTML = comment + ' in ' + editor;
-    });
+            console.log('drawing through api');
+            document.getElementById('comment').innerHTML = comment + ' in ' + editor;
+        });
+    }
 }
 
 
@@ -202,6 +209,8 @@ osmStream.runFn(function(err, data) {
                 editor = changesetInfo.editor;
                 comments[f.feature.changeset] = comment;
                 editors[f.feature.changeset] = editor;
+                console.log(Object.keys(comments).length);
+                console.log(Object.keys(editors).length);
             }
         }
         comment = comment.toLowerCase();
