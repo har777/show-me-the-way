@@ -37,7 +37,7 @@ if('users' in filterDataParams) {
     var filteredUsers = filterDataParams['users'].split(',');
 }
 
-var filteredCommentTerms = [''];
+var filteredCommentTerms = [];
 if('comments' in filterDataParams) {
     var filteredCommentTerms = filterDataParams['comments'].split(',');
 }
@@ -115,7 +115,7 @@ function showLocation(ll) {
             '' + resp.display_name + '';
     });
 }
-/*
+
 function showComment(id) {
     var changeset_url_tmpl = '//www.openstreetmap.org/api/0.6/changeset/{id}';
     reqwest({
@@ -138,7 +138,7 @@ function showComment(id) {
         document.getElementById('comment').innerHTML = comment + ' in ' + editor;
     });
 }
-*/
+
 /*
 function fetchComment(id) {
     var changeset_url_tmpl = '//www.openstreetmap.org/api/0.6/changeset/{id}';
@@ -174,13 +174,14 @@ osmStream.runFn(function(err, data) {
         var comment = '';
         var editor = '';
         //comment = fetchComment(f.feature.changeset);
-        if(userCleared) {
+        if(userCleared && filteredCommentTerms.length != 0) {
             //console.log(f.feature.changeset);
             if(f.feature.changeset in comments) {
                 comment = comments[f.feature.changeset];
                 //console.log('found in cache');
             }
             else {  
+                console.log('calling api');
                 var xmlHttp = null;
                 xmlHttp = new XMLHttpRequest();
                 xmlHttp.open( "GET", '//www.openstreetmap.org/api/0.6/changeset/' + f.feature.changeset, false );
@@ -195,9 +196,11 @@ osmStream.runFn(function(err, data) {
                     if (tags[i].getAttribute('k') == 'comment') {
                         comment = tags[i].getAttribute('v').substring(0, 60);
                     }
+                    /*
                     if (tags[i].getAttribute('k') == 'created_by') {
                         editor = tags[i].getAttribute('v').substring(0, 50);
                     }
+                    */
                 }
                 comments[f.feature.changeset] = comment;
                 editors[f.feature.changeset] = editor;
@@ -275,8 +278,8 @@ function drawWay(change, cb) {
         new L.LatLng(way.bounds[0], way.bounds[1]));
 
     if (farFromLast(bounds.getCenter())) showLocation(bounds.getCenter());
-    //showComment(way.changeset);
-    document.getElementById('comment').innerHTML = comments[way.changeset] + ' in ' + editors[way.changeset];
+    showComment(way.changeset);
+    //document.getElementById('comment').innerHTML = comments[way.changeset] + ' in ' + editors[way.changeset];
     var timedate = moment(change.meta.timestamp);
     change.timetext = timedate.fromNow();
 
